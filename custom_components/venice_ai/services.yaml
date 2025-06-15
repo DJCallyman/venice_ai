@@ -1,40 +1,137 @@
 generate_image:
+  name: Generate Image with Venice AI
+  description: Generate an image using Venice AI based on a text prompt.
   fields:
     config_entry:
+      description: The Venice AI config entry to use.
       required: true
+      example: "Venice AI Config" # Or an actual entry ID example if you have one
       selector:
         config_entry:
           integration: venice_ai
     prompt:
+      name: Prompt
+      description: A textual description of the desired image(s).
       required: true
+      example: "A futuristic cityscape at dusk with flying vehicles."
       selector:
         text:
           multiline: true
+    model:
+      name: Model
+      description: "Optional: The model to use for image generation. Defaults to the model configured in the integration's options or Venice AI's default if not specified."
+      example: "venice-sd35" # Example from swagger.txt
+      required: false
+      selector:
+        text: # Or a select selector if you have a dynamic list of image models
     size:
+      name: Size
+      description: "The desired dimensions of the generated image. Not all models support all sizes. 'auto' uses model's default."
       required: false
       example: "1024x1024"
-      default: "1024x1024"
+      default: "1024x1024" # Or "auto" if your API/client handles it
       selector:
         select:
           options:
+            - "auto" # As per swagger for SimpleGenerateImageRequest
+            - "256x256"
+            - "512x512"
             - "1024x1024"
             - "1024x1792"
             - "1792x1024"
+            - "1536x1024" # Added from swagger SimpleGenerateImageRequest
+            - "1024x1536" # Added from swagger SimpleGenerateImageRequest
+          # Consider adding custom: true if other values are allowed and passed to height/width directly for /image/generate
     quality:
+      name: Quality
+      description: "The quality of the generated image. This might be an OpenAI compatibility parameter not directly used by all Venice AI models."
       required: false
       example: "standard"
-      default: "standard"
+      default: "standard" # Or "auto" from swagger
       selector:
         select:
           options:
+            - "auto"   # From swagger SimpleGenerateImageRequest (quality)
             - "standard"
             - "hd"
+            - "high"   # From swagger SimpleGenerateImageRequest (quality)
+            - "medium" # From swagger SimpleGenerateImageRequest (quality)
+            - "low"    # From swagger SimpleGenerateImageRequest (quality)
     style:
+      name: Style
+      description: "The style of the generated image. This might be an OpenAI compatibility parameter or map to Venice AI's style_preset."
       required: false
       example: "vivid"
-      default: "vivid"
+      default: "natural" # From swagger SimpleGenerateImageRequest (style)
       selector:
         select:
           options:
             - "vivid"
             - "natural"
+    # Add other parameters from GenerateImageRequest or SimpleGenerateImageRequest (swagger.txt) as needed
+    # For example, 'negative_prompt', 'cfg_scale', 'steps', 'seed', 'format' (output_format in simple)
+    # 'response_format' (b64_json or url for simple)
+    # Note: The existing fields 'size', 'quality', 'style' seem to map to the OpenAI-compatible
+    # /images/generations endpoint (SimpleGenerateImageRequest in swagger).
+    # If your client targets /image/generate (GenerateImageRequest), the parameters are different
+    # (e.g., height, width, format, steps, cfg_scale).
+    # Clarify which endpoint your `client.images.generate` call targets.
+    # For this example, I've expanded options based on SimpleGenerateImageRequest where relevant.
+
+# New analyze_image service for vision capabilities
+analyze_image:
+  name: Analyze Image with Venice AI
+  description: Sends an image and a text prompt to Venice AI for vision-based analysis.
+  fields:
+    config_entry:
+      name: Configuration Entry
+      description: The Venice AI config entry to use.
+      required: true
+      example: "Venice AI Config"
+      selector:
+        config_entry:
+          integration: venice_ai
+    prompt:
+      name: Prompt
+      description: The text prompt to accompany the image and guide the analysis.
+      required: true
+      example: "What objects are in this image? Is there a person present?"
+      selector:
+        text:
+          multiline: true
+    image_entity:
+      name: Image Entity
+      description: "Optional: The camera entity_id from which to take a snapshot for analysis."
+      example: camera.living_room_feed
+      required: false # Will be enforced as one-of-many in __init__.py
+      selector:
+        entity:
+          domain: camera
+    image_url:
+      name: Image URL
+      description: "Optional: The publicly accessible URL of the image to analyze."
+      example: "https://example.com/image_to_analyze.jpg"
+      required: false
+      selector:
+        text:
+          type: url
+    image_path:
+      name: Image Path
+      description: "Optional: The local path to the image file accessible by Home Assistant."
+      example: "/config/www/shared_images/latest_capture.png"
+      required: false
+      selector:
+        text:
+    # Optional: Add a field to specify a vision-capable model if you don't want to rely solely on the config entry's default.
+    # model:
+    #   name: Model
+    #   description: "Optional: Specify a vision-capable model. Overrides the default model from integration settings."
+    #   example: "qwen-2.5-vl" # Example from swagger.txt chat completion response
+    #   required: false
+    #   selector:
+    #     text:
+  response:
+    # This section is optional in services.yaml but good for documentation.
+    # The actual response structure is determined by your handle_analyze_image function in __init__.py
+    description: "The textual analysis of the image provided by Venice AI."
+    example: '{"text": "The image contains a red apple on a wooden table."}'

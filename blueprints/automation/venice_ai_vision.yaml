@@ -1,0 +1,96 @@
+blueprint:
+  name: Venice AI Camera Vision Analysis
+  description: >-
+    Triggers on motion from a sensor, gets an AI analysis of a
+    camera's live feed from Venice AI, and sends a notification
+    with the analysis and a snapshot.
+  domain: automation
+  input:
+    motion_sensor:
+      name: Motion Sensor
+      description: The sensor that triggers the automation.
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+    camera_device:
+      name: Camera
+      description: The camera to analyze and take a snapshot from.
+      selector:
+        entity:
+          domain: camera
+    venice_ai_config_entry:
+      name: Venice AI Config Entry
+      description: The configured Venice AI integration to use.
+      selector:
+        config_entry:
+          integration: venice_ai
+    notify_device:
+      name: Notification Device
+      description: The mobile device to receive the notification. Must have the Home Assistant Companion App.
+      selector:
+        device:
+          integration: mobile_app
+    ai_prompt:
+      name: AI Prompt
+      description: The question to ask the AI about the image.
+      default: "What is happening in this image? Describe any people, animals, or vehicles."
+      selector:
+        text:
+          multiline: true
+    is_ios:
+      name: Is iOS Device?
+      description: Enable this if your notification device is an iPhone or iPad for correct image attachments.
+      default: false
+      selector:
+        boolean:
+
+# Automation Logic
+# This is the template for the automation that will be created from the blueprint.
+# It uses the inputs defined above.
+
+variables:
+  # Get the user's selections from the inputs
+  camera_device: !input camera_device
+  motion_sensor: !input motion_sensor
+  is_ios: !input is_ios
+  # Create some helper variables based on the inputs
+  camera_name: "{{ state_attr(camera_device, 'friendly_name') }}"
+  camera_path: "{{ state_attr(camera_device, 'friendly_name') | lower | replace(' ', '_') }}"
+  motion_name: "{{ state_attr(motion_sensor, 'friendly_name') }}"
+  snapshot_access_file_path: "/local/snapshots/{{ camera_path }}_snapshot.jpg" # Simplified to a single snapshot name
+
+trigger:
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+
+action:
+  # Take a single snapshot to attach to the notification
+  - service: camera.snapshot
+    data:
+      filename: "./www/snapshots/{{ camera_path }}_snapshot.jpg" # Simplified to a single snapshot name
+    target:
+      entity_id: !input camera_device
+
+  # Send the live camera feed to Venice AI for analysis
+  - service: venice_ai.analyze_image
+    data:
+      config_entry: !input venice_ai_config_entry
+      prompt: !input ai_prompt
+      image_entity: !input camera_device
+    response_variable: generated_content
+
+  # Send the notification with the AI's response and the snapshot
+  - device_id: !input notify_device
+    domain: mobile_app
+    type: notify
+    title: "{{ motion_name }} Detected"
+    message: "{{ generated_content['text'] }}"
+    data: >
+      {% set android_data = {"image": snapshot_access_file_path} %}
+      {% set ios_data = {"attachment": {"url":
+      snapshot_access_file_path, "content_type": "JPEG"}} %}
+      {{ ios_data if is_ios else android_data }}
+
+mode: single

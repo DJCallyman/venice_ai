@@ -195,9 +195,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                     image_mime_type = content_type_header.split(";")[0].strip()
             elif image_path:
                 _LOGGER.debug(f"Fetching image from path: {image_path}")
-                if not await hass.config.async_is_allowed_path(image_path):
+                if not hass.config.is_allowed_path(image_path):
                     raise ServiceValidationError(f"Path not allowed for Home Assistant access: {image_path}")
-                
                 def read_file_bytes_sync(path_to_read):
                     with open(path_to_read, "rb") as f_img:
                         return f_img.read()
